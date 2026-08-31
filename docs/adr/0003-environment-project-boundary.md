@@ -27,6 +27,14 @@ files. It never emits `ansible.cfg`, `inventory/`, `roles/`, or playbook
 stubs, and never touches existing Ansible content when run in a non-empty
 project.
 
+CI workflow files sit on the same side of the line (decided 2026-08-31): a
+`.github/workflows/` or `.gitlab-ci.yml` file is an opinion about where the
+project is hosted, a secrets-free build-only job produces an image that
+evaporates with the runner, and a useful build-and-push job needs registry
+credentials and tag strategy the scaffold cannot infer. Local build
+verification covers the correctness check; a future CI-scaffolding skill can
+compose with this one.
+
 Project structure belongs to a future `scaffold-ansible-project` skill whose
 first act is to call this one — the layering is the design. That skill is out
 of scope for v1: it is the natural second commit to the generic repo.
