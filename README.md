@@ -50,6 +50,9 @@ touches existing Ansible content. See
 ## Design notes
 
 Vocabulary in [CONTEXT.md](CONTEXT.md); decisions in [docs/adr/](docs/adr/).
+Skills here are developed with Claude Code: designed in recorded grill
+sessions (the ADRs are their output), with every change reviewed by me
+before it lands.
 
 ## License
 
