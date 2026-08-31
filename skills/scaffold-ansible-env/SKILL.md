@@ -65,13 +65,34 @@ output is EE-ready whether or not step 6 builds one.
 ### 5. Hygiene
 
 - `.pre-commit-config.yaml` from the roster below.
-- `.yamllint` extending the default config, relaxing only the rules that
-  fight ansible-lint's formatting opinions (line length, comment indentation).
-- `.gitignore` covering `.venv/` and, if step 6 fires, the EE build context.
+- `.yamllint` extending the default config, meeting ansible-lint's yamllint
+  requirements, and relaxing line length and comment indentation:
+
+  ```yaml
+  ---
+  extends: default
+
+  rules:
+    braces:
+      max-spaces-inside: 1
+    comments:
+      min-spaces-from-content: 1
+    comments-indentation: disable
+    line-length: disable
+    octal-values:
+      forbid-implicit-octal: true
+      forbid-explicit-octal: true
+  ```
+
+- `.gitignore` covering `.venv/`, `.ansible/` (ansible-lint's cache), and,
+  if step 6 fires, the EE build context.
 - `uv run pre-commit install`, then `uv run pre-commit run --all-files`.
 
-**Done when the full-tree pre-commit run passes.** Fix findings in files this
-skill created; report findings in pre-existing files to the user untouched.
+**Done when the full-tree pre-commit run passes and `uv run ansible-lint`
+prints no "incompatible custom yamllint configuration" warning** — the
+warning lands on stderr while the hook still passes, so check for it
+explicitly. Fix findings in files this skill created; report findings in
+pre-existing files to the user untouched.
 
 ### 6. Execution environment
 
@@ -95,9 +116,12 @@ Apply the rubric below — infer, then ask, then default:
 
 Write (or append a clearly-bounded section to) the project's `README.md`:
 
-- **Recreate the environment**: `uv sync` on a box with uv; `pip install -r
-  requirements.txt` on a stock box that has never heard of uv — the export
-  exists precisely for that box.
+- **Recreate the environment**: the uv path gets the copy-paste treatment —
+  link uv's install docs, then `uv sync`. The pip fallback gets prose, not a
+  command: name `requirements.txt` as the pip-compatible export for a box
+  without uv, to be installed into a virtual environment, never the system
+  interpreter. The missing copy-paste is deliberate friction — someone with
+  a real need for the fallback brings their own venv discipline.
 - **The derived-artifact rule**: `uv.lock` is authoritative;
   `requirements.txt` and `pylock.toml` are regenerated exports — edit
   `pyproject.toml` and re-export instead of touching them.
