@@ -121,7 +121,9 @@ development-tools image with lint and test suites baked in, disqualifies it
 as a runtime base. Prefer a source the project already trusts: the Ansible
 project's registries, or the user's own. A minimal OS base plus builder v3's
 `dependencies.ansible_core` and `dependencies.python_interpreter` keys is a
-sound default that installs exactly what the lockfiles say. Pin a versioned
+sound default that installs exactly what the lockfiles say; pair them with
+`dependencies.ansible_runner`, which builder's final-image check requires
+and a bare base lacks. Pin a versioned
 tag; a floating `latest` undoes the reproducibility the rest of the scaffold
 buys. When the base lacks `dnf`, set `options.package_manager_path` (for
 example to microdnf). Record the choice, and why, in the generated README.
