@@ -9,7 +9,7 @@ npx skills@latest add dmacduff/skills
 
 ## scaffold-ansible-env
 
-Stands up a reproducible Ansible **environment** — not project structure — in
+Stands up a reproducible Ansible **environment** (not project structure) in
 the current directory:
 
 - **uv owns Python**: pinned interpreter, project-managed venv,
@@ -19,17 +19,17 @@ the current directory:
   regenerated from it and never hand-edited. The `requirements.txt` is what
   makes the result installable on a stock box that has never heard of uv.
 - **pre-commit from the first commit**: `ansible-lint`, `yamllint` (tuned to
-  not fight ansible-lint), ruff, and the stock hygiene hooks.
+  meet ansible-lint's requirements), ruff, and the stock hygiene hooks.
 - **A decided execution-environment question**: a four-criterion rubric
   (shared control node, platform mismatch, multiple runners, unattended runs)
   applied as *infer → ask → default-no*. When it fires, the EE is one extra
-  file — `ansible-builder` consumes exactly the `requirements.txt` and
+  file, because `ansible-builder` consumes exactly the `requirements.txt` and
   `requirements.yml` the scaffold already emitted. When it doesn't, the
   rubric lands in your README so opting in later is deliberate, not
   archaeology.
 
 It never emits `ansible.cfg`, inventory, roles, or playbooks, and never
-touches existing Ansible content — see
+touches existing Ansible content. See
 [ADR 0003](docs/adr/0003-environment-project-boundary.md).
 
 ### Example
