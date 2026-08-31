@@ -117,11 +117,12 @@ Apply the rubric below — infer, then ask, then default:
 Write (or append a clearly-bounded section to) the project's `README.md`:
 
 - **Recreate the environment**: the uv path gets the copy-paste treatment —
-  link uv's install docs, then `uv sync`. The pip fallback gets prose, not a
-  command: name `requirements.txt` as the pip-compatible export for a box
-  without uv, to be installed into a virtual environment, never the system
-  interpreter. The missing copy-paste is deliberate friction — someone with
-  a real need for the fallback brings their own venv discipline.
+  link uv's install docs, then `uv sync`. The pip fallback gets prose
+  containing no pip command, fenced or inline: name `requirements.txt` as
+  the pip-compatible export for a box without uv, to be installed into a
+  virtual environment, never the system interpreter. The absent command is
+  deliberate friction — someone with a real need for the fallback brings
+  their own venv discipline.
 - **The derived-artifact rule**: `uv.lock` is authoritative;
   `requirements.txt` and `pylock.toml` are regenerated exports — edit
   `pyproject.toml` and re-export instead of touching them.
