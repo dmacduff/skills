@@ -47,7 +47,7 @@ prompt and it is never asked.
 
 | Question | Fires when | Answer it up front with |
 |---|---|---|
-| Normalize pre-existing files and pin the existing `requirements.yml`? | Retrofit only | "normalize existing files" / "leave existing files alone" |
+| Normalize pre-existing files and pin the existing `requirements.yml`? ("No" still appends baseline lines to an existing `.ansible-lint-ignore`.) | Retrofit only | "normalize existing files" / "leave existing files alone" |
 | EE criterion 1: is the control node shared or someone else's? | Not inferable from request or repo | "runs on our shared jump host" / "runs on my laptop" |
 | EE criterion 2: do collections need system-level deps the control node lacks? | Not inferable; a collection with system deps makes it true on its own | "control node has libssh" / name the collections |
 | EE criterion 3: does more than one person or pipeline run it? | Not inferable | "team of four runs this" / "just me" |

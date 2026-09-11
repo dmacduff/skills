@@ -42,7 +42,8 @@ as a whole, with the precondition folded in rather than asked separately:
 > Pre-existing files: I'd pin the collections in `requirements.yml` to the
 > versions Galaxy resolves today, and mechanically normalize any
 > pre-existing file the hooks flag (whitespace, end-of-file, line endings,
-> `---` document markers). Semantic ansible-lint findings get baselined in
+> `---` document markers, and ruff's safe fixes and formatting if the
+> project has Python). Semantic ansible-lint findings get baselined in
 > `.ansible-lint-ignore` (appended to yours if you already have one), not
 > edited. Either way, `pre-commit install`
 > means those same fixers run on any pre-existing file the next time it is
@@ -52,8 +53,11 @@ as a whole, with the precondition folded in rather than asked separately:
 
 Skip the question when the user's request already answers it (see the
 decision table in the repo README). "No" means steps 4 and 5 run in
-report-only mode for pre-existing files; the skill's own files are always
-fair game.
+report-only mode for pre-existing files, with one exception the question
+names: new baseline lines are still appended to an existing
+`.ansible-lint-ignore`, because without them the repo cannot be committed
+to. The skill's own files, including a `requirements.yml` this run
+creates, are always fair game.
 
 ### 2. Python environment
 
@@ -92,8 +96,9 @@ has no separate lockfile, so this one file carries both the request and the
 resolution.
 
 1. Write (or, on a retrofit, read) the direct collections from step 1. With
-   none yet, write the empty-but-valid manifest (`collections: []`) and skip
-   to step 5.
+   none yet and no pre-existing manifest, write the empty-but-valid
+   manifest (`collections: []`) and skip to step 5. A pre-existing manifest
+   with no collections is left as found.
 2. Resolve into a fresh project-local path, never the user's home. Remove
    `.ansible/collections` first if it exists, so a collection dropped from
    the graph since the last run cannot linger and get re-pinned, then:
@@ -127,9 +132,9 @@ resolution.
 
    Exact pins, not ranges: a floor on a transitive with nothing else
    recording the resolved version is an unpinned entry with extra typing.
-5. On a retrofit where the step 1 answer was no, leave `requirements.yml`
-   as found and report the resolved versions and every unpinned entry to
-   the user instead.
+5. When the manifest pre-existed the run and the step 1 answer was no,
+   leave it as found and report the resolved versions and every unpinned
+   entry to the user instead. A manifest this run created is always pinned.
 6. Without network access to Galaxy: on a greenfield run write the direct
    entries unpinned; on a retrofit leave the file exactly as found, since an
    existing lock must not be downgraded by a transient outage. Either way
@@ -187,10 +192,12 @@ resolution), then a re-run of steps 2 to 4. The generated README says so
   uncommittable, and fixing it is project work, not environment work. After
   a "no", the mechanical findings the user declined land here too. So:
   run `uv run ansible-lint --generate-ignore`, which writes
-  `.ansible-lint-ignore` with one line per file and rule. When that file
-  already exists, generate into a scratch location instead and append only
-  the lines not already present, so the user's `skip` annotations and
-  comments survive. Baselined findings still print as warnings on every run,
+  `.ansible-lint-ignore` with one line per file and rule for the whole
+  tree. Delete any line naming a file this skill created and fix that
+  finding instead; only pre-existing files may be baselined. When the
+  ignore file already exists, generate into a scratch location instead and
+  append only the lines not already present, so the user's `skip`
+  annotations and comments survive. Baselined findings still print as warnings on every run,
   and the user retires them by deleting lines. Report the baselined list,
   and call out any `syntax-check[*]` entries separately: those mean the
   file is broken, not untidy, and a baseline makes them look like style
