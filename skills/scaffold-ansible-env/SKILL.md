@@ -56,8 +56,9 @@ as a whole, with the precondition folded in rather than asked separately:
 > stash first if you want the normalization diff reviewable on its own.]
 > Go ahead?
 
-Skip the question when the user's request already answers it (see the
-decision table in the repo README). "No" means steps 4 and 5 run in
+Skip the question only when the request explicitly settles it
+("normalize existing files", "leave existing files alone"). A request that
+settles an EE criterion or the build check says nothing about this one. "No" means steps 4 and 5 run in
 report-only mode for pre-existing files, with one exception the question
 names: new baseline lines are still appended to an existing
 `.ansible-lint-ignore`, because without them the repo cannot be committed
@@ -112,15 +113,25 @@ resolution.
    installs land, while the resolver still consults every configured path,
    and a transitive already sitting in `~/.ansible/collections` is skipped
    rather than installed. Pinning to the env var makes the project path the
-   only path. ansible-lint uses that same location for its own installs, so
+   only path for ansible-core's resolver. ansible-lint scans its own
+   configured paths regardless and warns when a home-directory copy shadows
+   the project one; at equal versions that is noise, at different versions
+   it lints the home copy, so mention any such warning in the report.
+   ansible-lint uses that same location for its own installs, so
    `.ansible/` is already the cache the environment expects, and step 5
    gitignores it.
 3. Read the resolved graph with the same variable set:
    `ANSIBLE_COLLECTIONS_PATH=.ansible/collections uv run ansible-galaxy collection list --format yaml`.
 4. Rewrite the `collections:` list in `requirements.yml` with every listed
    collection at its exact resolved version, direct entries first, then
-   transitives under a comment. Leave every other top-level key (`roles:`
-   and anything else the file carries) exactly as found:
+   transitives under a comment. A pre-existing direct entry keeps every key
+   it had (`type`, `source`, `signatures`, anything else) and only its
+   `version` is set: the user approved pinning, not changing where a
+   collection comes from. A `type: git` entry already pinned to a tag or
+   commit is left as found; one with no `version`, or a branch name, gets
+   the commit the install log reports as checked out. Leave every other
+   top-level key
+   (`roles:` and anything else the file carries) exactly as found:
 
    ```yaml
    ---
@@ -137,10 +148,23 @@ resolution.
 
    Exact pins, not ranges: a floor on a transitive with nothing else
    recording the resolved version is an unpinned entry with extra typing.
-5. When the manifest pre-existed the run and the step 1 answer was no,
+5. When the install fails on an entry the scaffold cannot reach (a private
+   `source:` that needs credentials, a git host it cannot clone): on a
+   greenfield run or a retrofit answered yes, retry without that entry, pin
+   everything else, and leave the unreachable entry exactly as found; on a
+   retrofit answered no, rewrite nothing. Either way report the entry by
+   name so the user can pin it from a host that can. Know the consequence:
+   ansible-lint installs `requirements.yml` itself on every run, so it
+   fails the same way on this host, and `pre-commit` cannot pass it
+   `--offline` per run. Run the standalone step 5 lint commands with
+   `--offline`, run the gate as `SKIP=ansible-lint`, do not bake
+   `--offline` into the hook (a fresh clone would then lint without its
+   collections), and state in the report and README that the ansible-lint
+   hook stays red on any host that cannot reach that source.
+6. When the manifest pre-existed the run and the step 1 answer was no,
    leave it as found and report the resolved versions and every unpinned
    entry to the user instead. A manifest this run created is always pinned.
-6. Without network access to Galaxy: on a greenfield run write the direct
+7. Without network access to Galaxy: on a greenfield run write the direct
    entries unpinned; on a retrofit leave the file exactly as found, since an
    existing lock must not be downgraded by a transient outage. Either way
    report that pinning was skipped, and the README's collection-lock
@@ -184,9 +208,15 @@ resolution), then a re-run of steps 2 to 4. The generated README says so
 
 - `.gitignore` covering `.venv/`, `.ansible/` (ansible-lint's cache and the
   step 4 collection install), and, if step 6 fires, the EE build context.
-- `uv run pre-commit install`, then the fixer pass, scoped by the step 1
-  answer and run with `SKIP=ansible-lint` so the whole-tree linter does not
-  fail it before the baseline exists:
+- `uv run pre-commit install`, then `git add --intent-to-add` every file
+  this skill created. `--all-files` means tracked files, and with the
+  scaffold untracked every file-scoped hook reports "Skipped (no files to
+  check)" while only the whole-tree ansible-lint hook runs, a gate that
+  checked almost nothing. Pre-existing files are already tracked; never
+  stage them, since a dirty tree's edits belong to the user. Then the
+  fixer pass, scoped by the step 1 answer and run with
+  `SKIP=ansible-lint` so the whole-tree linter does not fail it before the
+  baseline exists:
   - **Greenfield, or retrofit answered yes**:
     `SKIP=ansible-lint uv run pre-commit run --all-files`. The auto-fixers
     rewrite whatever they flag, which is the mechanical normalization the
@@ -224,7 +254,11 @@ resolution), then a re-run of steps 2 to 4. The generated README says so
 - The gate: the same `pre-commit run` as the fixer pass, without `SKIP`.
 
 **Done when the gate passes on its scope, `uv run ansible-lint` exits zero,
-and it prints no "incompatible custom yamllint configuration" warning.** The warning lands on stderr while the hook still passes, so check
+and it prints no "incompatible custom yamllint configuration" warning.**
+The one exception is an unreachable manifest entry (step 4, item 5): there
+the gate is `SKIP=ansible-lint`, the lint check is `uv run ansible-lint
+--offline`, and done includes the report stating that the hook is red on
+this host. The warning lands on stderr while the hook still passes, so check
 for it explicitly. Findings in files this skill created are fixed, always;
 the skill's own output never lands in the baseline.
 

@@ -54,7 +54,12 @@ test, and rewrite on request.
   transitive section so stale pins cannot constrain the new resolution,
   reinstall into a fresh path, rewrite pins.
 - Only the `collections:` list is generated. `roles:` and any other key the
-  file carries are preserved as found.
+  file carries are preserved as found, and so is every per-entry key on a
+  pre-existing direct entry (`type`, `source`, `signatures`): pinning sets
+  `version` and nothing else; a git entry already pinned to a tag or commit
+  is not rewritten. An entry the scaffold cannot reach is left as found and
+  reported rather than dropped, with the stated consequence that
+  ansible-lint, which installs the manifest itself, stays red on that host.
 - The skill gains a network dependency on Galaxy at scaffold time. Offline,
   a greenfield run writes the unpinned manifest; a retrofit leaves the
   existing file untouched rather than downgrade a lock. Both report that
