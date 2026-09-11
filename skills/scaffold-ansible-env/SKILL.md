@@ -34,6 +34,11 @@ Establish, from the directory and the user's request:
 - Whether Python source (modules, filter plugins) exists or is planned. Ruff
   ships by default; leave it out only when the user signals the project will
   never contain Python.
+- On a retrofit, which YAML states the `check-yaml` hook must be configured
+  for: vault-encrypted files (first line starts with `$ANSIBLE_VAULT;`; find
+  them by content, not name), custom tags (`!vault`, `!unsafe`, mkdocs'
+  `!!python/name:`), and multi-document files. Record the paths; step 5
+  uses them.
 
 **On a retrofit, ask once before writing anything.** One question covering
 everything this skill may change in pre-existing files, answered yes or no
@@ -151,7 +156,13 @@ resolution), then a re-run of steps 2 to 4. The generated README says so
 
 ### 5. Hygiene
 
-- `.pre-commit-config.yaml` from the roster below.
+- `.pre-commit-config.yaml` from the roster below, with `check-yaml`
+  configured for whatever step 1 found: `args: [--unsafe]` when any file
+  carries custom tags, `--allow-multiple-documents` for multi-document
+  files, and an anchored `exclude:` regex listing every vault-encrypted
+  file (plus the project's evident naming convention, such as
+  `vault\.yml$`, so the next vault file is covered too). Encrypted files
+  are not YAML and cannot be checked as such.
 - `.yamllint` extending the default config, meeting ansible-lint's yamllint
   requirements, and relaxing line length and comment indentation:
 
@@ -202,6 +213,13 @@ resolution), then a re-run of steps 2 to 4. The generated README says so
   and call out any `syntax-check[*]` entries separately: those mean the
   file is broken, not untidy, and a baseline makes them look like style
   debt.
+- **Some inherited failures block, by design.** `check-yaml` after the
+  configuration above, `detect-private-key`, `check-merge-conflict`, and
+  `check-added-large-files` have no baseline and get no exclude: a genuine
+  YAML syntax error, a committed key, or a conflict marker in a
+  pre-existing file is a defect the repo should refuse to commit. Report
+  each one with the file and the hook, and say plainly that the gate is
+  red until the user fixes it. Do not disable the hook to get green.
 
 - The gate: the same `pre-commit run` as the fixer pass, without `SKIP`.
 
@@ -300,8 +318,10 @@ From `pre-commit-hooks` (pin current tags at run time):
 - `end-of-file-fixer`
 - `trailing-whitespace` with `args: [--markdown-linebreak-ext=md]`, so the
   two-space markdown line break survives.
-- `check-yaml`: add `--allow-multiple-documents` or excludes when the
-  project carries multi-document YAML or vault files.
+- `check-yaml`: `--unsafe` when the project uses custom tags (`!vault`,
+  `!unsafe`), `--allow-multiple-documents` for multi-document YAML, and an
+  `exclude:` for vault-encrypted files, all per the step 1 survey. Never
+  dropped: with those set, what it still catches is a real syntax error.
 - `check-merge-conflict`
 - `check-added-large-files`
 - `detect-private-key`

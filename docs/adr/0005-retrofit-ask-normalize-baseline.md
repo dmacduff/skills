@@ -63,6 +63,14 @@ rejected as a second, silent scope rule the user did not ask for.
 --files`, and the done-criterion applies to that scope. The baseline is
 generated either way, since it does not modify pre-existing files.
 
+Not every inherited failure is baselined. `check-yaml` is configured for
+the states Ansible repos legitimately carry (vault-encrypted files excluded
+by content-detected path, `--unsafe` for `!vault` and `!unsafe` tags,
+`--allow-multiple-documents`), and after that it, `detect-private-key`,
+`check-merge-conflict`, and `check-added-large-files` are left to block: a
+syntax error, a committed key, or a conflict marker is a defect the repo
+should refuse, and the skill reports it rather than disabling the hook.
+
 Interaction budget: greenfield stays at a maximum of two questions (EE
 criteria, build check). Retrofit adds exactly one. The repo README carries a
 decision table so a user can put every answer in the prompt and be asked
