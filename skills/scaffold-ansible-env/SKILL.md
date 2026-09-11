@@ -56,8 +56,9 @@ as a whole, with the precondition folded in rather than asked separately:
 > stash first if you want the normalization diff reviewable on its own.]
 > Go ahead?
 
-Skip the question when the user's request already answers it (see the
-decision table in the repo README). "No" means steps 4 and 5 run in
+Skip the question when the user's request already answers it ("normalize
+existing files" or "leave existing files alone" in the request is an
+answer; so is a phrase settling any EE criterion or the build check). "No" means steps 4 and 5 run in
 report-only mode for pre-existing files, with one exception the question
 names: new baseline lines are still appended to an existing
 `.ansible-lint-ignore`, because without them the repo cannot be committed
@@ -112,15 +113,25 @@ resolution.
    installs land, while the resolver still consults every configured path,
    and a transitive already sitting in `~/.ansible/collections` is skipped
    rather than installed. Pinning to the env var makes the project path the
-   only path. ansible-lint uses that same location for its own installs, so
+   only path for ansible-core's resolver. ansible-lint scans its own
+   configured paths regardless and warns when a home-directory copy shadows
+   the project one; at equal versions that is noise, at different versions
+   it lints the home copy, so mention any such warning in the report.
+   ansible-lint uses that same location for its own installs, so
    `.ansible/` is already the cache the environment expects, and step 5
    gitignores it.
 3. Read the resolved graph with the same variable set:
    `ANSIBLE_COLLECTIONS_PATH=.ansible/collections uv run ansible-galaxy collection list --format yaml`.
 4. Rewrite the `collections:` list in `requirements.yml` with every listed
    collection at its exact resolved version, direct entries first, then
-   transitives under a comment. Leave every other top-level key (`roles:`
-   and anything else the file carries) exactly as found:
+   transitives under a comment. A pre-existing direct entry keeps every key
+   it had (`type`, `source`, `signatures`, anything else) and only its
+   `version` is set: the user approved pinning, not changing where a
+   collection comes from. A `type: git` entry already pinned to a tag or
+   commit is left as found; one with no `version`, or a branch name, gets
+   the commit the install log reports as checked out. Leave every other
+   top-level key
+   (`roles:` and anything else the file carries) exactly as found:
 
    ```yaml
    ---
@@ -137,10 +148,20 @@ resolution.
 
    Exact pins, not ranges: a floor on a transitive with nothing else
    recording the resolved version is an unpinned entry with extra typing.
-5. When the manifest pre-existed the run and the step 1 answer was no,
+5. When the install fails on an entry the scaffold cannot reach (a private
+   `source:` that needs credentials, a git host it cannot clone), retry
+   without that entry, pin everything else, leave the unreachable entry
+   exactly as found, and report it by name so the user can pin it from a
+   host that can. Know the consequence: ansible-lint installs
+   `requirements.yml` itself on every run, so it fails the same way on this
+   host. Run the step 5 lint commands with `--offline` for this session
+   only, do not bake `--offline` into the hook (a fresh clone would then
+   lint without its collections), and state in the report and README that
+   the gate stays red on any host that cannot reach that source.
+6. When the manifest pre-existed the run and the step 1 answer was no,
    leave it as found and report the resolved versions and every unpinned
    entry to the user instead. A manifest this run created is always pinned.
-6. Without network access to Galaxy: on a greenfield run write the direct
+7. Without network access to Galaxy: on a greenfield run write the direct
    entries unpinned; on a retrofit leave the file exactly as found, since an
    existing lock must not be downgraded by a transient outage. Either way
    report that pinning was skipped, and the README's collection-lock
@@ -184,9 +205,12 @@ resolution), then a re-run of steps 2 to 4. The generated README says so
 
 - `.gitignore` covering `.venv/`, `.ansible/` (ansible-lint's cache and the
   step 4 collection install), and, if step 6 fires, the EE build context.
-- `uv run pre-commit install`, then the fixer pass, scoped by the step 1
-  answer and run with `SKIP=ansible-lint` so the whole-tree linter does not
-  fail it before the baseline exists:
+- `uv run pre-commit install`, then `git add` every file this skill wrote:
+  `--all-files` means tracked files, and an unstaged scaffold makes every
+  hook report "Skipped (no files to check)", a green gate that checked
+  nothing. Then the fixer pass, scoped by the step 1 answer and run with
+  `SKIP=ansible-lint` so the whole-tree linter does not fail it before the
+  baseline exists:
   - **Greenfield, or retrofit answered yes**:
     `SKIP=ansible-lint uv run pre-commit run --all-files`. The auto-fixers
     rewrite whatever they flag, which is the mechanical normalization the
