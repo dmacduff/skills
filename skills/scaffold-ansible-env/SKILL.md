@@ -56,9 +56,9 @@ as a whole, with the precondition folded in rather than asked separately:
 > stash first if you want the normalization diff reviewable on its own.]
 > Go ahead?
 
-Skip the question when the user's request already answers it ("normalize
-existing files" or "leave existing files alone" in the request is an
-answer; so is a phrase settling any EE criterion or the build check). "No" means steps 4 and 5 run in
+Skip the question only when the request explicitly settles it
+("normalize existing files", "leave existing files alone"). A request that
+settles an EE criterion or the build check says nothing about this one. "No" means steps 4 and 5 run in
 report-only mode for pre-existing files, with one exception the question
 names: new baseline lines are still appended to an existing
 `.ansible-lint-ignore`, because without them the repo cannot be committed
@@ -149,15 +149,18 @@ resolution.
    Exact pins, not ranges: a floor on a transitive with nothing else
    recording the resolved version is an unpinned entry with extra typing.
 5. When the install fails on an entry the scaffold cannot reach (a private
-   `source:` that needs credentials, a git host it cannot clone), retry
-   without that entry, pin everything else, leave the unreachable entry
-   exactly as found, and report it by name so the user can pin it from a
-   host that can. Know the consequence: ansible-lint installs
-   `requirements.yml` itself on every run, so it fails the same way on this
-   host. Run the step 5 lint commands with `--offline` for this session
-   only, do not bake `--offline` into the hook (a fresh clone would then
-   lint without its collections), and state in the report and README that
-   the gate stays red on any host that cannot reach that source.
+   `source:` that needs credentials, a git host it cannot clone): on a
+   greenfield run or a retrofit answered yes, retry without that entry, pin
+   everything else, and leave the unreachable entry exactly as found; on a
+   retrofit answered no, rewrite nothing. Either way report the entry by
+   name so the user can pin it from a host that can. Know the consequence:
+   ansible-lint installs `requirements.yml` itself on every run, so it
+   fails the same way on this host, and `pre-commit` cannot pass it
+   `--offline` per run. Run the standalone step 5 lint commands with
+   `--offline`, run the gate as `SKIP=ansible-lint`, do not bake
+   `--offline` into the hook (a fresh clone would then lint without its
+   collections), and state in the report and README that the ansible-lint
+   hook stays red on any host that cannot reach that source.
 6. When the manifest pre-existed the run and the step 1 answer was no,
    leave it as found and report the resolved versions and every unpinned
    entry to the user instead. A manifest this run created is always pinned.
