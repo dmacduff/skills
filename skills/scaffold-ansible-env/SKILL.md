@@ -208,10 +208,13 @@ resolution), then a re-run of steps 2 to 4. The generated README says so
 
 - `.gitignore` covering `.venv/`, `.ansible/` (ansible-lint's cache and the
   step 4 collection install), and, if step 6 fires, the EE build context.
-- `uv run pre-commit install`, then `git add` every file this skill wrote:
-  `--all-files` means tracked files, and an unstaged scaffold makes every
-  hook report "Skipped (no files to check)", a green gate that checked
-  nothing. Then the fixer pass, scoped by the step 1 answer and run with
+- `uv run pre-commit install`, then `git add --intent-to-add` every file
+  this skill created. `--all-files` means tracked files, and with the
+  scaffold untracked every file-scoped hook reports "Skipped (no files to
+  check)" while only the whole-tree ansible-lint hook runs, a gate that
+  checked almost nothing. Pre-existing files are already tracked; never
+  stage them, since a dirty tree's edits belong to the user. Then the
+  fixer pass, scoped by the step 1 answer and run with
   `SKIP=ansible-lint` so the whole-tree linter does not fail it before the
   baseline exists:
   - **Greenfield, or retrofit answered yes**:
@@ -251,7 +254,11 @@ resolution), then a re-run of steps 2 to 4. The generated README says so
 - The gate: the same `pre-commit run` as the fixer pass, without `SKIP`.
 
 **Done when the gate passes on its scope, `uv run ansible-lint` exits zero,
-and it prints no "incompatible custom yamllint configuration" warning.** The warning lands on stderr while the hook still passes, so check
+and it prints no "incompatible custom yamllint configuration" warning.**
+The one exception is an unreachable manifest entry (step 4, item 5): there
+the gate is `SKIP=ansible-lint`, the lint check is `uv run ansible-lint
+--offline`, and done includes the report stating that the hook is red on
+this host. The warning lands on stderr while the hook still passes, so check
 for it explicitly. Findings in files this skill created are fixed, always;
 the skill's own output never lands in the baseline.
 
