@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted (2026-08-30)
+Accepted (2026-08-30). Amended by ADR 0005 (2026-09-11): the "never touches
+existing Ansible content" clause is narrowed to never changing its meaning;
+mechanical normalization and manifest pinning are allowed with the user's
+consent.
 
 ## Context
 

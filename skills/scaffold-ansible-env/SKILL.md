@@ -12,8 +12,11 @@ a shrug.
 
 Environment only. Project structure (`ansible.cfg`, `inventory/`, `roles/`,
 playbooks) belongs to a broader scaffold that calls this one. Existing
-Ansible content in the directory is read-only input: mine it for dependencies
-and rubric evidence, and leave every byte of it alone.
+Ansible content in the directory is input: mine it for dependencies and
+rubric evidence. The only changes this skill makes to it are the mechanical
+normalization and manifest pinning the user approves in step 1; semantic
+findings in pre-existing files are baselined and reported, never fixed
+(ADR 0005).
 
 The environment is the source of truth for tool invocations: before running
 any command sketched below, confirm its flags against the tool's `--help`.
@@ -32,14 +35,34 @@ Establish, from the directory and the user's request:
   ships by default; leave it out only when the user signals the project will
   never contain Python.
 
+**On a retrofit, ask once before writing anything.** One question covering
+everything this skill may change in pre-existing files, answered yes or no
+as a whole, with the precondition folded in rather than asked separately:
+
+> Pre-existing files: I'd pin the collections in `requirements.yml` to the
+> versions Galaxy resolves today, and mechanically normalize any
+> pre-existing file the hooks flag (whitespace, end-of-file, line endings,
+> `---` document markers). Semantic ansible-lint findings get baselined in
+> `.ansible-lint-ignore`, not edited. Either way, `pre-commit install`
+> means those same fixers run on any pre-existing file the next time it is
+> committed. [If dirty: Your tree has uncommitted changes to X; commit or
+> stash first if you want the normalization diff reviewable on its own.]
+> Go ahead?
+
+Skip the question when the user's request already answers it (see the
+decision table in the repo README). "No" means steps 4 and 5 run in
+report-only mode for pre-existing files; the skill's own files are always
+fair game.
+
 ### 2. Python environment
 
 uv owns the interpreter and the venv:
 
 - `uv init --bare` (skip if `pyproject.toml` exists), then `uv python pin` a
   current supported Python.
-- `uv add ansible-core`, plus any Python libraries the project's collections
-  document as requirements.
+- `uv add ansible-core`. The Python libraries the collections document as
+  requirements become readable once step 4 installs them; add those then
+  and re-run the step 3 exports.
 - `uv add --dev ansible-lint yamllint pre-commit ruff` (ruff per step 1).
 
 ### 3. Lock artifacts
@@ -62,10 +85,55 @@ says so (step 7).
 
 ### 4. Galaxy manifest
 
-Write `requirements.yml` listing the collections from step 1, or an
-empty-but-valid manifest (`collections: []`) when there are none yet.
+`requirements.yml` is the collection lock: every collection the project
+runs, direct and transitive, pinned to an exact version (ADR 0004). Galaxy
+has no separate lockfile, so this one file carries both the request and the
+resolution.
+
+1. Write (or, on a retrofit, read) the direct collections from step 1. With
+   none yet, write the empty-but-valid manifest (`collections: []`) and skip
+   to step 5.
+2. Resolve by installing project-locally, never into the user's home:
+   `ANSIBLE_COLLECTIONS_PATH=.ansible/collections uv run ansible-galaxy collection install -r requirements.yml -p .ansible/collections`.
+   The environment variable is load-bearing: `-p` only chooses where new
+   installs land, while the resolver still consults every configured path,
+   and a transitive already sitting in `~/.ansible/collections` is skipped
+   rather than installed. Pinning to the env var makes the project path the
+   only path. ansible-lint uses that same location for its own installs, so
+   `.ansible/` is already the cache the environment expects, and step 5
+   gitignores it.
+3. Read the resolved graph with the same variable set:
+   `ANSIBLE_COLLECTIONS_PATH=.ansible/collections uv run ansible-galaxy collection list --format yaml`.
+4. Rewrite `requirements.yml` with every listed collection at its exact
+   resolved version, direct entries first, then transitives under a comment:
+
+   ```yaml
+   ---
+   collections:
+     - name: cisco.ios
+       version: "11.5.1"
+     # Transitive dependencies of the collections above, pinned so the
+     # resolved graph is reproducible. Regenerate rather than hand-edit.
+     - name: ansible.netcommon
+       version: "8.6.2"
+     - name: ansible.utils
+       version: "6.1.0"
+   ```
+
+   Exact pins, not ranges: a floor on a transitive with nothing else
+   recording the resolved version is an unpinned entry with extra typing.
+5. On a retrofit where the step 1 answer was no, leave `requirements.yml`
+   as found and report the resolved versions and every unpinned entry to
+   the user instead.
+6. Without network access to Galaxy, write the direct entries unpinned and
+   report that pinning was skipped; the README's collection-lock section
+   then says the file is not yet locked.
+
 Together with `requirements.txt`, this is exactly what `ansible-builder`
 consumes: the output is EE-ready whether or not step 6 builds one.
+
+**Upgrading** is a deliberate edit to the direct entry followed by a re-run
+of steps 2 to 4, and the generated README says so (step 7).
 
 ### 5. Hygiene
 
@@ -89,15 +157,39 @@ consumes: the output is EE-ready whether or not step 6 builds one.
       forbid-explicit-octal: true
   ```
 
-- `.gitignore` covering `.venv/`, `.ansible/` (ansible-lint's cache), and,
-  if step 6 fires, the EE build context.
-- `uv run pre-commit install`, then `uv run pre-commit run --all-files`.
+- `.gitignore` covering `.venv/`, `.ansible/` (ansible-lint's cache and the
+  step 4 collection install), and, if step 6 fires, the EE build context.
+- `uv run pre-commit install`, then the lint gate, scoped by the step 1
+  answer:
+  - **Greenfield, or retrofit answered yes**:
+    `uv run pre-commit run --all-files`. The auto-fixers rewrite whatever
+    they flag, which is the mechanical normalization the user approved. Add
+    `---` document markers by hand where ansible-lint's
+    `yaml[document-start]` reports them: the fixers don't, and the
+    standalone yamllint hook only warns on it.
+  - **Retrofit answered no**: `uv run pre-commit run --files <every file
+    this skill created>`. Pre-existing files are not passed to the hooks.
+- **Baseline whatever remains in pre-existing files.** The ansible-lint hook is defined with
+  `pass_filenames: false` and `always_run: true`, so it lints the whole tree
+  on every commit regardless of scope. Any semantic finding left in a
+  pre-existing file (FQCN, `no-changed-when`, naming) would make the repo
+  uncommittable, and fixing it is project work, not environment work. After
+  a "no", the mechanical findings the user declined land here too. So:
+  run `uv run ansible-lint --generate-ignore`, which writes
+  `.ansible-lint-ignore` with one line per file and rule. When that file
+  already exists, generate into a scratch location instead and append only
+  the lines not already present, so the user's `skip` annotations and
+  comments survive. Baselined findings still print as warnings on every run,
+  and the user retires them by deleting lines. Report the baselined list,
+  and call out any `syntax-check[*]` entries separately: those mean the
+  file is broken, not untidy, and a baseline makes them look like style
+  debt.
 
-**Done when the full-tree pre-commit run passes and `uv run ansible-lint`
-prints no "incompatible custom yamllint configuration" warning.** The
-warning lands on stderr while the hook still passes, so check for it
-explicitly. Fix findings in files this skill created; report findings in
-pre-existing files to the user untouched.
+**Done when the lint gate passes on its scope, `uv run ansible-lint` exits
+zero, and it prints no "incompatible custom yamllint configuration"
+warning.** The warning lands on stderr while the hook still passes, so check
+for it explicitly. Findings in files this skill created are fixed, always;
+the skill's own output never lands in the baseline.
 
 ### 6. Execution environment
 
@@ -149,6 +241,13 @@ Write (or append a clearly-bounded section to) the project's `README.md`:
 - **The derived-artifact rule**: `uv.lock` is authoritative;
   `requirements.txt` and `pylock.toml` are regenerated exports. Edit
   `pyproject.toml` and re-export instead of touching them.
+- **The collection lock rule**: `requirements.yml` pins the full resolved
+  collection graph. To upgrade, edit the direct entry, reinstall to
+  `.ansible/collections`, and rewrite the pins from the resolved list.
+- **What the retrofit changed**, when applicable: which pre-existing files
+  were normalized (or that none were, by the user's choice), and that
+  `.ansible-lint-ignore` baselines the inherited findings and shrinks as
+  lines are deleted.
 - **The EE rubric, verbatim**, with the decision this run made and the
   one-file opt-in path if it decided no.
 
