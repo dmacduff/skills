@@ -24,3 +24,28 @@ spec.
 A file generated from an authoritative source and never hand-edited. The
 pip-compatible `requirements.txt` and PEP 751 `pylock.toml` are derived from
 `uv.lock`, which is primary; derived files say so in their headers.
+
+## Collection lock
+
+`requirements.yml` as emitted by the scaffold when Galaxy was reachable:
+every collection the project runs, direct and transitive, pinned to the
+exact version resolved at scaffold time. An offline run emits the direct
+entries unpinned and says so. Galaxy has no separate lockfile, so this one file is both the
+request and the resolution (see ADR 0004). Upgrades edit a direct entry and
+re-resolve.
+
+## Baseline
+
+The `.ansible-lint-ignore` file the scaffold generates on a retrofit,
+listing every ansible-lint finding still present in pre-existing files after
+the run, one line per file and rule: semantic findings always, plus the
+mechanical ones the user declined to have normalized. Skill-created files
+never appear in it. Baselined findings warn but do not block; the
+list shrinks as lines are deleted (see ADR 0005).
+
+## Mechanical normalization
+
+The bounded set of changes the scaffold may make to pre-existing files with
+the user's consent: auto-fixer output (whitespace, end-of-file, line endings,
+ruff safe fixes) and `---` document markers. Anything that changes what the
+automation does is not mechanical (see ADR 0005).

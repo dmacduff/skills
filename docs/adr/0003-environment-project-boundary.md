@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted (2026-08-30)
+Accepted (2026-08-30). Amended by ADR 0005 (2026-09-11): the "never touches
+existing Ansible content" clause is narrowed to never changing its meaning;
+mechanical normalization and manifest pinning are allowed with the user's
+consent.
 
 ## Context
 
@@ -24,8 +27,9 @@ about how automation is run — project territory either way.
 need: `.gitignore`, `.pre-commit-config.yaml`, `.yamllint`, an empty-but-valid
 `requirements.yml`, the generated README, and (when the rubric fires) the EE
 files. It never emits `ansible.cfg`, `inventory/`, `roles/`, or playbook
-stubs, and never touches existing Ansible content when run in a non-empty
-project.
+stubs, and never changes the meaning of existing Ansible content when run in
+a non-empty project (mechanical normalization and manifest pinning, with the
+user's consent, are the bounded exceptions: ADR 0005).
 
 CI workflow files sit on the same side of the line (decided 2026-08-31): a
 `.github/workflows/` or `.gitlab-ci.yml` file is an opinion about where the
