@@ -50,10 +50,14 @@ test, and rewrite on request.
 - Reproducibility now covers the collection graph, matching the posture the
   scaffold already took for Python and the EE base image.
 - `requirements.yml` is derived from a resolution, and the generated README
-  says so and gives the upgrade path (edit the direct entry, reinstall,
-  rewrite pins).
-- The skill gains a network dependency on Galaxy at scaffold time. Offline
-  scaffolding writes the unpinned manifest and reports that pinning was
-  skipped.
+  says so and gives the upgrade path: edit the direct entry, delete the
+  transitive section so stale pins cannot constrain the new resolution,
+  reinstall into a fresh path, rewrite pins.
+- Only the `collections:` list is generated. `roles:` and any other key the
+  file carries are preserved as found.
+- The skill gains a network dependency on Galaxy at scaffold time. Offline,
+  a greenfield run writes the unpinned manifest; a retrofit leaves the
+  existing file untouched rather than downgrade a lock. Both report that
+  pinning was skipped.
 - On a retrofit, rewriting a pre-existing `requirements.yml` is a change to
   pre-existing content and falls under the ADR 0005 ask.

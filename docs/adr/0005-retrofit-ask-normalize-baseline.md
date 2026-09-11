@@ -51,7 +51,13 @@ project work outside this skill. They are baselined with
 `ansible-lint --generate-ignore`, which writes `.ansible-lint-ignore` one
 line per file and rule. Baselined findings print as non-fatal warnings on
 every run and retire by deleting lines. A pre-existing ignore file is never
-overwritten; new lines are appended.
+overwritten; new lines are appended, and the question says so.
+
+The dirty-tree clause is advice, not a hard stop. The fixers are mechanical
+and cannot lose content, the user is told exactly which files are dirty, and
+a hard stop would turn one question into two round trips. Constraining
+normalization to files unchanged since the last commit was considered and
+rejected as a second, silent scope rule the user did not ask for.
 
 "No" scopes the lint gate to skill-created files via `pre-commit run
 --files`, and the done-criterion applies to that scope. The baseline is
